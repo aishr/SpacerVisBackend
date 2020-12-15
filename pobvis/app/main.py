@@ -71,26 +71,39 @@ def learn_transformation_modified():
     request_params = request.get_json()
     print(request_params)
     exp_path = request_params.get('exp_path', '')
-    inputOutputExamples = request_params.get('inputOutputExamples', '')
     exp_folder = os.path.join(MEDIA, exp_path)
-    declare_statements = get_declare_statements(exp_folder)
+    inputOutputExamples = request_params.get('inputOutputExamples', '')
+    params = request_params.get('params', '')
+    print(params)
+    tType = request_params.get('type', '')
     body = {
         'instance': exp_path,
-        'declareStatements': declare_statements,
         'inputOutputExamples': inputOutputExamples
     }
     print(body)
-    url = os.path.join(PROSEBASEURL, 'learntransformationmodified')
+    if tType == "replace":
+        url = os.path.join(PROSEBASEURL, 'variables', 'replace')
+        response = requests.post(url, json=body)
+        print(response)
+        if response.status_code != 200:
+            abort(response.status_code)
+
+        return json.dumps({'status': "success", "response": response.json()})
+        
+    declare_statements = get_declare_statements(exp_folder)
+    body['declareStatements'] = declare_statements
+    body['type'] = tType
+    print(body)
+    url = os.path.join(PROSEBASEURL, 'transformations/learntransformationmodified')
     response = requests.post(url, json=body)
     print(response)
     if response.status_code != 200:
-        return json.dumps({'status': "error"})
+        abort(response.status_code)
 
     with open(os.path.join(exp_folder, "possible_transformations"), "w") as f:
          f.write(json.dumps(response.json()))
     return json.dumps({'status': "success", "response": response.json()})
     
-
 def apply_transformation():
 
     request_params = request.get_json()
