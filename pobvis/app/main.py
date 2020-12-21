@@ -5,7 +5,7 @@ import sys
 if sys.version_info.major < 3:
     raise Exception("User error: This application only supports Python 3, so please use python3 instead of python!")
 import json
-from flask import Flask, request
+from flask import Flask, request, abort
 from flask_cors import CORS
 import tempfile
 import argparse
@@ -49,7 +49,6 @@ def pooling():
 
 def learn_transformation():
     request_params = request.get_json()
-    print(request_params)
     exp_path = request_params.get('exp_path', '')
     exp_folder = os.path.join(MEDIA, exp_path)
     declare_statements = get_declare_statements(exp_folder)
@@ -57,11 +56,10 @@ def learn_transformation():
         'instance': exp_path,
         'declareStatements': declare_statements
     }
-    print(body)
     url = os.path.join(PROSEBASEURL, 'learntransformation')
     response = requests.post(url, json=body)
     if response.status_code != 200:
-        return json.dumps({'status': "error"})
+        abort(response.status_code)
 
     with open(os.path.join(exp_folder, "possible_transformations"), "w") as f:
          f.write(json.dumps(response.json()))
@@ -69,22 +67,18 @@ def learn_transformation():
 
 def learn_transformation_modified():
     request_params = request.get_json()
-    print(request_params)
     exp_path = request_params.get('exp_path', '')
     exp_folder = os.path.join(MEDIA, exp_path)
     inputOutputExamples = request_params.get('inputOutputExamples', '')
     params = request_params.get('params', '')
-    print(params)
     tType = request_params.get('type', '')
     body = {
         'instance': exp_path,
         'inputOutputExamples': inputOutputExamples
     }
-    print(body)
     if tType == "replace":
         url = os.path.join(PROSEBASEURL, 'variables', 'replace')
         response = requests.post(url, json=body)
-        print(response)
         if response.status_code != 200:
             abort(response.status_code)
 
@@ -93,10 +87,8 @@ def learn_transformation_modified():
     declare_statements = get_declare_statements(exp_folder)
     body['declareStatements'] = declare_statements
     body['type'] = tType
-    print(body)
-    url = os.path.join(PROSEBASEURL, 'transformations/learntransformationmodified')
+    url = os.path.join(PROSEBASEURL, 'transformations', 'learntransformationmodified')
     response = requests.post(url, json=body)
-    print(response)
     if response.status_code != 200:
         abort(response.status_code)
 
@@ -116,10 +108,10 @@ def apply_transformation():
         'declareStatements': declare_statements,
         'program': chosen_program
     }
-    url = os.path.join(PROSEBASEURL, 'applytransformation')
+    url = os.path.join(PROSEBASEURL, 'transformations', 'applytransformation')
     response = requests.post(url, json=body)
     if response.status_code != 200:
-        return json.dumps({'status': "error"})
+        abort(response.status_code)
 
     with open(os.path.join(exp_folder, "transformed_expr_map"), "w") as f:
          f.write(json.dumps(response.json()))
