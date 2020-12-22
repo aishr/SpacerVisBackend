@@ -77,12 +77,14 @@ def learn_transformation_modified():
         'inputOutputExamples': inputOutputExamples
     }
     if tType == "replace":
+        body['params'] = params 
         url = os.path.join(PROSEBASEURL, 'variables', 'replace')
         response = requests.post(url, json=body)
         if response.status_code != 200:
             abort(response.status_code)
 
         return json.dumps({'status': "success", "response": response.json()})
+    
         
     declare_statements = get_declare_statements(exp_folder)
     body['declareStatements'] = declare_statements
@@ -123,9 +125,7 @@ def get_declare_statements(exp_folder):
         for line in f:
             temp_result.append(line.strip())
 
-    return " ".join(temp_result)
-    
-    
+    return "\n".join(temp_result)
 
 def save_exprs(dynamodb=None):
     region = environ.get('REGION_NAME')
