@@ -14,10 +14,11 @@ import io
 import os
 from os import environ
 from settings import DATABASE, MEDIA, PROSEBASEURL, options_for_visualization
-from subprocess import PIPE, STDOUT, Popen, run
+from subprocess import PIPE, STDOUT, Popen, run, check_output
 from chctools import horndb as H
 from utils.utils import *
 import utils.trace_parsing as ms
+import re
 app = Flask(__name__)
 app.config.from_object(__name__)
 CORS(app)
@@ -46,6 +47,24 @@ def update_status():
 def pooling():
     update_status()
     return fetch_exps()
+
+def fetch_options(): 
+    test_args = [args.z3_path, "-p"]
+    output = check_output(test_args)
+    lines = output.decode("utf-8").split("\n")
+    result = parse_options(lines)
+    return json.dumps(result)
+
+def parse_options(lines):
+    result = []
+    prefix = ""
+    for line in lines:
+        if re.search("\[module\]\ ([a-zA-Z]+).*", line):
+            prefix = re.findall("\[module\]\ ([a-zA-Z]+).*", line)[0]
+        elif re.search("\ \ \ \ (.*)\ \((.*)\)\ \(default:\ (.*)\)", line):
+            details = re.findall("\ \ \ \ (.*)\ \((.*)\)\ \(default:\ (.*)\)", line)[0]
+            result.append({"name": (prefix if prefix == "" else prefix + ".") + details[0], "type": details[1], "default": details[2], "dash": True if prefix == "" else False})
+    return result
 
 def learn_transformation():
     request_params = request.get_json()
@@ -230,7 +249,7 @@ def start_spacer():
     #save VarNames
     with open(os.path.join(exp_folder, "var_names"), "w") as f:
         f.write(var_names)
-
+        
     Popen(run_args, stdin=PIPE, stdout=stdout_file, stderr=stderr_file, cwd = exp_folder)
 
     return json.dumps({'status': "success", 'spacer_state': "running", 'exp_name': new_exp_name})
@@ -333,6 +352,9 @@ def poke():
 @app.route('/spacer/fetch_exps', methods=['POST'])
 def handle_fetch_exps():
     return pooling()
+@app.route('/spacer/fetch_options', methods=['POST'])
+def handle_fetch_options():
+    return fetch_options()
 @app.route('/spacer/start_iterative', methods=['POST'])
 def handle_start_spacer_iterative():
     return start_spacer()
