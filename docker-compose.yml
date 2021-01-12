@@ -1,7 +1,7 @@
 version: "3.8"
 services:
   SpacerVisBackend:
-    build: ~/visualizer/SpacerVisBackend/
+    build: ./
     image: spacervisbackend
     ports: 
       - 5000:5000
