@@ -17,25 +17,30 @@
 *** DONE Include whats the transformation
 ** TODO indication of what has been manually changed
     - have to rewrite where the graph is created
-** TODO File errors
+** DONE File errors
 *** DONE Hari's file
 *** DONE Lia files > 46
-*** TODO Arie's file
+*** DONE Arie's file
     - run the input file in spacer and see what shows up
       - should have more interesting lemmas
 ** TODO show the final invariant (see all the stars together)
-*** apply a transformation to all lemmas 
+*** TODO apply a transformation to all lemmas 
 ** TODO user can change the variable names in the visualized version
    - include a legend on a side
    - could be flash fill esque (future) (regular excel flashfill)
    - Nham could help with the deep learning on this
 ** TODO better error logging on the frontend (which part of the stack is this error)
-** TODO Make literal movements more keyboard friendly but with structure
    
 * Prose & Prose API
 ** Think of an architecture for this whole thing
 ** Multiple Clause Transformations
    - A < 0 && A >= 0 -> A == 0
+** TODO Implement all transformations in front end editor
+*** DONE ToImp
+*** DONE SquashNegation
+*** TODO FlipCmp
+*** DONE Move
+*** TODO Variable Replace
 
 ** Clause Transformation
 *** DONE complete the system
