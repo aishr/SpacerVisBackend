@@ -46,6 +46,7 @@ def insert_db(query, args=(), one=False):
     cur.close()
 
 def fetch_exps():
+
     exps_list = []
     for exp in query_db('select * from exp'):
         r = {}
@@ -53,6 +54,18 @@ def fetch_exps():
             r[k] = exp[k]
         exps_list.append(r)
     return json.dumps({'status': "success", 'exps_list':exps_list})
+
+def fetch_progs():
+    # request_params = request.get_json()
+    # exp_path = request_params.get('exp_path', '')
+    progs_list = []
+    for prog in query_db('select * from learned_programs'):
+        r = {}
+        for k in prog.keys():
+            r[k] = prog[k]
+        progs_list.append(r)
+    return json.dumps({'status': "success", 'progs_list':progs_list})
+
 
 def get_new_exp_name(exp_name):
     now = datetime.now()
