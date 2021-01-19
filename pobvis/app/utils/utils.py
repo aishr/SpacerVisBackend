@@ -18,7 +18,15 @@ def safe_read(file_path):
         print(e)
         return [""]
 
+def get_expr_map(exp_path):
+    expr_map = {}
+    expr_from_exp_path = query_db('SELECT * FROM expr_map WHERE exp_path=?',(exp_path,))
+    for r in expr_from_exp_path:
+        expr_id = r['expr_id']
+        value = json.loads(r['value'])
+        expr_map[expr_id] = value
 
+    return expr_map
 
 def get_db():
     db = getattr(g, '_database', None)

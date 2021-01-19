@@ -147,73 +147,37 @@ def get_declare_statements(exp_folder):
     return "\n".join(temp_result)
 
 def save_exprs(dynamodb=None):
-    region = environ.get('REGION_NAME')
-    access_key = environ.get('ACCESS_KEY_ID')
-    secret_key = environ.get('SECRET_ACCESS_KEY')
-    table_name = environ.get('TABLE_NAME')
-    if not dynamodb:
-        dynamodb = boto3.resource(
-                'dynamodb',
-                region_name=region,
-                aws_access_key_id=access_key,
-                aws_secret_access_key=secret_key
-        )
-        client = boto3.client(
-                'dynamodb',
-                region_name=region,
-                aws_access_key_id=access_key,
-                aws_secret_access_key=secret_key
-        )
-    existing_tables = client.list_tables()['TableNames']
-    if table_name not in existing_tables:
-        table = dynamodb.create_table(
-            TableName=table_name,
-            AttributeDefinitions=[
-                {'AttributeName': 'Id', 'AttributeType': 'S'},
-            ],
-            KeySchema=[
-                {'AttributeName': 'Id', 'KeyType': 'HASH'}
-            ],
-            ProvisionedThroughput={
-                'ReadCapacityUnits': 5,
-                'WriteCapacityUnits': 5,
-            }
-        )
-        
-    else:
-        table = dynamodb.Table(table_name)
+    status = "success"
+    try:
+        request_params = request.get_json()
+        exp_path = request_params.get('exp_path', '')
+        expr_map = request_params.get('expr_map', '')
+        expr_map = json.loads(expr_map)
+        exp_folder = os.path.join(MEDIA, exp_path)
 
-    table_info = client.describe_table(
-        TableName=table_name
-    )
-    table_status = table_info['Table']['TableStatus']
-    while table_status != "ACTIVE":
-        table_info = client.describe_table(
-            TableName=table_name
-        )
-        table_status = table_info['Table']['TableStatus']
-    request_params = request.get_json()
-    exp_path = request_params.get('exp_path', '')
-    expr_map = request_params.get('expr_map', '')
-    exp_folder = os.path.join(MEDIA, exp_path)
+        cur = None
+        for k in expr_map:
+            #use replace to insert
+            cur = get_db().execute('REPLACE INTO expr_map(exp_path, expr_id, value) VALUES (?,?,?)',(exp_path,
+                                                                                                     int(k),
+                                                                                                     json.dumps(expr_map[k])))
+        get_db().commit()
+        cur.close()
 
-    with open(os.path.join(exp_folder, "expr_map"), "w") as f:
-        f.write(expr_map)
-
-    dbData = json.loads(expr_map)
-    dbData["Id"] = exp_path
-    response = table.put_item(Item=dbData)
-
-    return json.dumps({'status': "success" if response['ResponseMetadata']['HTTPStatusCode'] == 200 else "error"})
+    except Exception as e:
+        status = "Error: {}".format(e)
+    return json.dumps({'status': status})
 
 def get_exprs(): 
     request_params = request.get_json()
     exp_path = request_params.get('exp_path', '')
-    exp_folder = os.path.join(MEDIA, exp_path)
 
-    expr_map = safe_read(os.path.join(exp_folder, "expr_map"))
+
+    print("exp_path", exp_path)
+    expr_map = get_expr_map(exp_path)
+
     return json.dumps({'status': "success",
-                       'expr_map': expr_map[0]})
+                       'expr_map': expr_map})
 
 def start_spacer():
     request_params = request.get_json()
@@ -302,7 +266,7 @@ def poke():
     run_cmd = safe_read(os.path.join(exp_folder, "run_cmd"))[0].strip()
     temp_var_names = safe_read(os.path.join(exp_folder, "var_names")) 
     var_names = temp_var_names[0].strip() if temp_var_names != [] else ""
-    expr_map = safe_read(os.path.join(exp_folder, "expr_map"))
+    expr_map = get_expr_map(exp_path)
 
     status = "success"
     spacer_state = get_spacer_state(stderr, stdout)
@@ -346,7 +310,7 @@ def poke():
                        'nodes_list': nodes_list,
                        'run_cmd': run_cmd,
                        'var_names': var_names,
-                       'expr_map': expr_map[0]})
+                       'expr_map': expr_map})
 
 
 @app.route('/spacer/fetch_exps', methods=['POST'])
