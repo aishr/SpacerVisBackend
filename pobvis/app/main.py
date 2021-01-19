@@ -19,6 +19,8 @@ from chctools import horndb as H
 from utils.utils import *
 import utils.trace_parsing as ms
 import re
+import hashlib
+
 app = Flask(__name__)
 app.config.from_object(__name__)
 CORS(app)
@@ -26,6 +28,7 @@ CORS(app)
 parser = argparse.ArgumentParser(description='Run Spacer Server')
 parser.add_argument("-z3", "--z3", required=True, action="store", dest="z3_path", help="path to z3 python")
 args = parser.parse_args()
+
 
 def update_status():
     exps_list = []
@@ -66,35 +69,20 @@ def parse_options(lines):
             result.append({"name": (prefix if prefix == "" else prefix + ".") + details[0], "type": details[1], "default": details[2], "dash": True if prefix == "" else False})
     return result
 
-def learn_transformation():
-    request_params = request.get_json()
-    exp_path = request_params.get('exp_path', '')
-    exp_folder = os.path.join(MEDIA, exp_path)
-    declare_statements = get_declare_statements(exp_folder)
-    body = {
-        'instance': exp_path,
-        'declareStatements': declare_statements
-    }
-    url = os.path.join(PROSEBASEURL, 'learntransformation')
-    response = requests.post(url, json=body)
-    if response.status_code != 200:
-        abort(response.status_code)
-
-    with open(os.path.join(exp_folder, "possible_transformations"), "w") as f:
-         f.write(json.dumps(response.json()))
-    return json.dumps({'status': "success", "response": response.json()})
-
 def learn_transformation_modified():
     request_params = request.get_json()
     exp_path = request_params.get('exp_path', '')
     exp_folder = os.path.join(MEDIA, exp_path)
+    expr_map = get_expr_map(exp_path)
     inputOutputExamples = request_params.get('inputOutputExamples', '')
     params = request_params.get('params', '')
     tType = request_params.get('type', '')
     body = {
         'instance': exp_path,
-        'inputOutputExamples': inputOutputExamples
+        'inputOutputExamples': inputOutputExamples,
+        'exprMap': json.dumps(expr_map)
     }
+
     if tType == "replace":
         body['params'] = params 
         url = os.path.join(PROSEBASEURL, 'variables', 'replace')
@@ -113,8 +101,20 @@ def learn_transformation_modified():
     if response.status_code != 200:
         abort(response.status_code)
 
-    with open(os.path.join(exp_folder, "possible_transformations"), "w") as f:
-         f.write(json.dumps(response.json()))
+    print("response from prose:", response);
+    print("response from prose:", json.dumps(response.json()))
+
+    #save to database
+    cur = None
+    for possible_t in response.json():
+        hash_val = hashlib.sha256(possible_t["humanReadableAst"].encode('utf-8')).hexdigest()
+        cur = get_db().execute('REPLACE INTO learned_programs(hash, human_readable_ast, xml_ast, comment) VALUES (?,?,?, ?)',(hash_val,
+                                                                                                                             possible_t["humanReadableAst"],
+                                                                                                                             possible_t["xmlAst"],
+                                                                                                                             ""))
+    get_db().commit()
+    cur.close()
+
     return json.dumps({'status': "success", "response": response.json()})
     
 def apply_transformation():
@@ -123,11 +123,14 @@ def apply_transformation():
     exp_path = request_params.get('exp_path', '')
     chosen_program = request_params.get('selectedProgram', '')
     exp_folder = os.path.join(MEDIA, exp_path)
+    expr_map = get_expr_map(exp_path)
     declare_statements = get_declare_statements(exp_folder)
+    print(json.dumps(expr_map, indent=4)[:200])
     body = {
         'instance': exp_path,
         'declareStatements': declare_statements,
-        'program': chosen_program
+        'program': chosen_program,
+        'exprMap': json.dumps(expr_map)
     }
     url = os.path.join(PROSEBASEURL, 'transformations', 'applytransformation')
     response = requests.post(url, json=body)
@@ -316,6 +319,9 @@ def poke():
 @app.route('/spacer/fetch_exps', methods=['POST'])
 def handle_fetch_exps():
     return pooling()
+@app.route('/spacer/fetch_progs', methods=['POST'])
+def handle_fetch_progs():
+    return fetch_progs()
 @app.route('/spacer/fetch_options', methods=['POST'])
 def handle_fetch_options():
     return fetch_options()
