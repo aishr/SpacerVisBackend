@@ -337,9 +337,6 @@ def handle_save():
 @app.route('/spacer/get_exprs', methods=['POST'])
 def handle_get():
     return get_exprs()
-@app.route('/spacer/learn_transformation', methods=['POST'])
-def handle_learn_transform():
-    return learn_transformation()
 @app.route('/spacer/learn_transformation_modified', methods=['POST'])
 def handle_learn_transform_modified():
     return learn_transformation_modified()
