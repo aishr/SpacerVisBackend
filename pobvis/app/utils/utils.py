@@ -28,6 +28,10 @@ def get_expr_map(exp_path):
 
     return expr_map
 
+def get_spacer_instance(exp_path):
+    return {"Id": exp_path, "Lemmas": get_expr_map(exp_path)}
+
+
 def get_db():
     db = getattr(g, '_database', None)
     if db is None:
