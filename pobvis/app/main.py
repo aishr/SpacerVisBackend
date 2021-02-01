@@ -73,16 +73,17 @@ def learn_transformation_modified():
     request_params = request.get_json()
     exp_path = request_params.get('exp_path', '')
     exp_folder = os.path.join(MEDIA, exp_path)
-    expr_map = get_expr_map(exp_path)
+    spacer_instance = get_spacer_instance(exp_path)
     inputOutputExamples = request_params.get('inputOutputExamples', '')
     params = request_params.get('params', '')
     tType = request_params.get('type', '')
     body = {
         'instance': exp_path,
         'inputOutputExamples': inputOutputExamples,
-        'exprMap': json.dumps(expr_map)
+        'spacerInstance': json.dumps(spacer_instance)
     }
 
+    print(json.dumps(spacer_instance, indent=4)[:200])
     if tType == "replace":
         body['params'] = params 
         url = os.path.join(PROSEBASEURL, 'variables', 'replace')
@@ -112,8 +113,9 @@ def learn_transformation_modified():
                                                                                                                              possible_t["humanReadableAst"],
                                                                                                                              possible_t["xmlAst"],
                                                                                                                              ""))
-    get_db().commit()
-    cur.close()
+    if cur is not None:
+        get_db().commit()
+        cur.close()
 
     return json.dumps({'status': "success", "response": response.json()})
     
@@ -123,14 +125,13 @@ def apply_transformation():
     exp_path = request_params.get('exp_path', '')
     chosen_program = request_params.get('selectedProgram', '')
     exp_folder = os.path.join(MEDIA, exp_path)
-    expr_map = get_expr_map(exp_path)
+    spacer_instance = get_spacer_instance(exp_path)
     declare_statements = get_declare_statements(exp_folder)
-    print(json.dumps(expr_map, indent=4)[:200])
+    print(json.dumps(spacer_instance, indent=4)[:200])
     body = {
-        'instance': exp_path,
         'declareStatements': declare_statements,
         'program': chosen_program,
-        'exprMap': json.dumps(expr_map)
+        'spacerInstance': json.dumps(spacer_instance)
     }
     url = os.path.join(PROSEBASEURL, 'transformations', 'applytransformation')
     response = requests.post(url, json=body)
@@ -164,8 +165,9 @@ def save_exprs(dynamodb=None):
             cur = get_db().execute('REPLACE INTO expr_map(exp_path, expr_id, value) VALUES (?,?,?)',(exp_path,
                                                                                                      int(k),
                                                                                                      json.dumps(expr_map[k])))
-        get_db().commit()
-        cur.close()
+        if cur is not None:
+            get_db().commit()
+            cur.close()
 
     except Exception as e:
         status = "Error: {}".format(e)
@@ -298,7 +300,6 @@ def poke():
                 ast = rels[0].pysmt_parse_lemma(expr_stream)
                 ast_json = order_node(to_json(ast))
                 node["ast_json"] = ast_json
-
             except Exception as e:
                 # PySMT has a bug in __str__ of the Exception, hence for now we need to turn off the debug message here
                 # print("expr stream:", expr)
