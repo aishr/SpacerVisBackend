@@ -50,7 +50,6 @@ def insert_db(query, args=(), one=False):
     cur.close()
 
 def fetch_exps():
-
     exps_list = []
     for exp in query_db('select * from exp'):
         r = {}

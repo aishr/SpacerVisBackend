@@ -29,7 +29,6 @@ parser = argparse.ArgumentParser(description='Run Spacer Server')
 parser.add_argument("-z3", "--z3", required=True, action="store", dest="z3_path", help="path to z3 python")
 args = parser.parse_args()
 
-
 def update_status():
     exps_list = []
     for exp in query_db('select * from exp where done is 0'):
