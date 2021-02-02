@@ -68,7 +68,7 @@ def parse_options(lines):
             result.append({"name": (prefix if prefix == "" else prefix + ".") + details[0], "type": details[1], "default": details[2], "dash": True if prefix == "" else False})
     return result
 
-def learn_transformation_modified():
+def learn_transformation():
     request_params = request.get_json()
     exp_path = request_params.get('exp_path', '')
     exp_folder = os.path.join(MEDIA, exp_path)
@@ -96,7 +96,7 @@ def learn_transformation_modified():
     declare_statements = get_declare_statements(exp_folder)
     body['declareStatements'] = declare_statements
     body['type'] = tType
-    url = os.path.join(PROSEBASEURL, 'transformations', 'learntransformationmodified')
+    url = os.path.join(PROSEBASEURL, 'transformations', 'learntransformation')
     response = requests.post(url, json=body)
     if response.status_code != 200:
         abort(response.status_code)
@@ -337,9 +337,9 @@ def handle_save():
 @app.route('/spacer/get_exprs', methods=['POST'])
 def handle_get():
     return get_exprs()
-@app.route('/spacer/learn_transformation_modified', methods=['POST'])
-def handle_learn_transform_modified():
-    return learn_transformation_modified()
+@app.route('/spacer/learn_transformation', methods=['POST'])
+def handle_learn_transform():
+    return learn_transformation()
 @app.route('/spacer/apply_transformation', methods=['POST'])
 def handle_apply_transform():
     return apply_transformation()
