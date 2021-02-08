@@ -119,12 +119,43 @@ def learn_transformation():
     return json.dumps({'status': "success", "response": response.json()})
     
 def apply_transformation():
-
     request_params = request.get_json()
     exp_path = request_params.get('exp_path', '')
     chosen_program = request_params.get('selectedProgram', '')
     exp_folder = os.path.join(MEDIA, exp_path)
     spacer_instance = get_spacer_instance(exp_path)
+    declare_statements = get_declare_statements(exp_folder)
+    print(json.dumps(spacer_instance, indent=4)[:200])
+    body = {
+        'declareStatements': declare_statements,
+        'program': chosen_program,
+        'spacerInstance': json.dumps(spacer_instance)
+    }
+    url = os.path.join(PROSEBASEURL, 'transformations', 'applytransformation')
+    response = requests.post(url, json=body)
+    if response.status_code != 200:
+        abort(response.status_code)
+
+    with open(os.path.join(exp_folder, "transformed_expr_map"), "w") as f:
+         f.write(json.dumps(response.json()))
+    return json.dumps({'status': "success", "response": response.json()})
+
+def apply_multi_transformation():
+    """
+    This endpoint allows us to apply multiple transformation on top of eachother
+    It is essentially the same as apply_transformation, but use the expr_map sent by
+    the frontend, instead of from the db, a.k.a line
+
+    spacer_instance = {"Id": exp_path, "Lemmas": lemmas}
+    vs
+    spacer_instance = get_spacer_instance(exp_path)
+    """
+    request_params = request.get_json()
+    exp_path = request_params.get('exp_path', '')
+    lemmas = request_params.get('lemmas', {})
+    chosen_program = request_params.get('selectedProgram', '')
+    exp_folder = os.path.join(MEDIA, exp_path)
+    spacer_instance = {"Id": exp_path, "Lemmas": lemmas}
     declare_statements = get_declare_statements(exp_folder)
     print(json.dumps(spacer_instance, indent=4)[:200])
     body = {
@@ -343,6 +374,9 @@ def handle_learn_transform():
 @app.route('/spacer/apply_transformation', methods=['POST'])
 def handle_apply_transform():
     return apply_transformation()
+@app.route('/spacer/apply_multi_transformation', methods=['POST'])
+def handle_apply_multi_transform():
+    return apply_multi_transformation()
 @app.route('/spacer/upload_files', methods=['POST'])
 def handle_upload_files():
     return upload_files()
