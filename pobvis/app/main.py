@@ -20,7 +20,7 @@ from utils.utils import *
 import utils.trace_parsing as ms
 import re
 import hashlib
-
+import z3
 app = Flask(__name__)
 app.config.from_object(__name__)
 CORS(app)
@@ -264,9 +264,10 @@ def upload_files():
 
     request_params = request.get_json()
     spacer_log = request_params.get('spacerLog', '')
-    input_file = request_params.get('inputFile', '')
+    input_file = request_params.get('inputProblem', '')
     run_cmd = request_params.get('runCmd', '')
-    new_exp_name = request_params.get('expName', '')
+    exp_name = request_params.get('expName', '')
+    new_exp_name = get_new_exp_name(exp_name)
     insert_db('INSERT INTO exp(name, done, result, aux, time) VALUES (?,?,?,?,?)',(new_exp_name, 0, "UNK", "NA", 0))
     exp_folder = os.path.join(MEDIA, new_exp_name)
     os.mkdir(exp_folder)
@@ -275,6 +276,7 @@ def upload_files():
     _write_file(exp_folder, input_file, "input_file.smt2")
     _write_file(exp_folder, spacer_log, "spacer.log")
     _write_file(exp_folder, run_cmd, "run_cmd")
+    _write_file(exp_folder, "sat\n", "stdout")
 
     return json.dumps({'status': "success", 'message': "success"})
 
@@ -296,7 +298,6 @@ def poke():
     run_cmd = ""
     stdout = safe_read(os.path.join(exp_folder, "stdout"))
     stderr = safe_read(os.path.join(exp_folder, "stderr"))
-    z3_trace = safe_read(os.path.join(exp_folder, ".z3-trace"))
     spacer_log = safe_read(os.path.join(exp_folder, "spacer.log"))
     run_cmd = safe_read(os.path.join(exp_folder, "run_cmd"))[0].strip()
     temp_var_names = safe_read(os.path.join(exp_folder, "var_names")) 
@@ -307,6 +308,7 @@ def poke():
     spacer_state = get_spacer_state(stderr, stdout)
     #load the file into db for parsing
     try:
+        new_context = z3.Context()
         db = H.load_horn_db_from_file(os.path.join(exp_folder, "input_file.smt2"))
         rels = []
         for rel_name in db._rels:
@@ -317,7 +319,7 @@ def poke():
                 save_var_rels(rel, f);
     except:
         status = "error in loading horndb. skip parsing the file"
-
+        print(status)
     #TODO: only read spacer.log when there are no errors
     nodes_list = ms.parse(spacer_log)
     #parse expr to json
