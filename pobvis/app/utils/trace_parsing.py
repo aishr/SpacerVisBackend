@@ -172,7 +172,7 @@ def save_var_rels(rel, f):
         sort = str(rel._fdecl.domain(i)).replace(",", "").replace("(", " ").replace(")", "")
         f.write(file_line.format(name=name, sort=sort))
 
-def parse_ongoing_exp(exp_name):
+def parse_exp(exp_name):
     exp_folder = os.path.join(MEDIA, exp_name)
     nodes_list = []
     run_cmd = ""
@@ -203,28 +203,40 @@ def parse_ongoing_exp(exp_name):
         print(status)
     nodes_list = parse(spacer_log)
     #parse expr to json
-    if len(rels)>0:
-        for idx in nodes_list:
-            node = nodes_list[idx]
-            if node["exprID"]>2:
-                expr = node["expr"]
-                expr_stream = io.StringIO(expr)
-                try:
-                    ast = rels[1].pysmt_parse_lemma(expr_stream)
-                    ast_json = order_node(to_json(ast))
-                    node["ast_json"] = ast_json
-                except Exception as e:
-                    print(rels)
-                    traceback.print_exc()
-                    node["ast_json"] = {"type": "ERROR", "content": "trace is incomplete"}
+    # if len(rels)>0:
+    #     for idx in nodes_list:
+    #         node = nodes_list[idx]
+    #         if node["exprID"]>2:
+    #             expr = node["expr"]
+    #             expr_stream = io.StringIO(expr)
+    #             node["ast_json"] = {"type": "ERROR", "content": "NA"}
+    #             for rel in rels:
+    #                 try:
+    #                     ast = rel.pysmt_parse_lemma(expr_stream)
+    #                     ast_json = order_node(to_json(ast))
+    #                     node["ast_json"] = ast_json
+    #                 except Exception as e:
+    #                     print(rels)
+    #                     traceback.print_exc()
+    #                 break
 
-    return {'status': status,
-            'spacer_state': spacer_state,
-            'nodes_list': nodes_list,
-            'run_cmd': run_cmd,
-            'var_names': var_names,
-            'expr_map': expr_map}
+    
+    res = {'status': status,
+           'spacer_state': spacer_state,
+           'nodes_list': nodes_list,
+           'run_cmd': run_cmd,
+           'var_names': var_names,
+           'expr_map': expr_map}
 
+    #write to db
+    if spacer_state !="running":
+        try:
+            insert_db('REPLACE INTO nodes_list(exp_name, nodes_list) VALUES (?,?)',
+                      (exp_name, json.dumps(res)))
+        except:
+            traceback.print_exc()
+
+    return res
 if __name__=="__main__":
     file_name = "/home/nv3le/workspace/saturation-visualization/deepSpacer/pobvis/app/.z3-trace" 
     if len(sys.argv) > 1:

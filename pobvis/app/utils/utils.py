@@ -18,18 +18,18 @@ def safe_read(file_path):
         print(e)
         return [""]
 
-def get_expr_map(exp_path):
+def get_expr_map(exp_name):
     expr_map = {}
-    expr_from_exp_path = query_db('SELECT * FROM expr_map WHERE exp_path=?',(exp_path,))
-    for r in expr_from_exp_path:
+    expr_from_exp_name = query_db('SELECT * FROM expr_map WHERE exp_name=?',(exp_name,))
+    for r in expr_from_exp_name:
         expr_id = r['expr_id']
         value = json.loads(r['value'])
         expr_map[expr_id] = value
 
     return expr_map
 
-def get_spacer_instance(exp_path):
-    return {"Id": exp_path, "Lemmas": get_expr_map(exp_path)}
+def get_spacer_instance(exp_name):
+    return {"Id": exp_name, "Lemmas": get_expr_map(exp_name)}
 
 
 def get_db():
@@ -60,7 +60,7 @@ def fetch_exps():
 
 def fetch_progs():
     # request_params = request.get_json()
-    # exp_path = request_params.get('exp_path', '')
+    # exp_name = request_params.get('exp_name', '')
     progs_list = []
     for prog in query_db('select * from learned_programs'):
         r = {}
@@ -131,7 +131,15 @@ def check_if_process_running(processName):
     return False;
 
 def get_spacer_state(stderr, stdout):
+    """
+    must return one of the state in accepted states
+    """
+    accepted_states = ["sat", "unsat", "unk", "running", "uploaded"]
+    res = "running"
     #TODO: implement me
     if stdout[0] != '':
-        return stdout[0]
-    return "running"
+        res = stdout[0].strip()
+
+
+    assert(res in accepted_states)
+    return res

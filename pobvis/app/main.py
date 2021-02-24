@@ -8,7 +8,6 @@ from flask import Flask, request, abort
 from flask_cors import CORS
 import tempfile
 import argparse
-import io
 import os
 
 from subprocess import PIPE, STDOUT, Popen, run, check_output
@@ -33,7 +32,7 @@ def update_status():
         r = {}
         for k in exp.keys():
             r[k] = exp[k]
-        exps_list.append(exp["name"])
+        exps_list.append(exp["exp_name"])
 
     # NHAM: Legacy code. Now we will check if the parsing is done using the parser itself
     # for exp in exps_list:
@@ -220,7 +219,7 @@ def start_spacer():
     exp_name = request_params.get('expName', '')
     new_exp_name = get_new_exp_name(exp_name)
     print(new_exp_name)
-    insert_db('INSERT INTO exp(name, done, result, aux, time) VALUES (?,?,?,?,?)',(new_exp_name, 0, "UNK", "NA", 0))
+    insert_db('INSERT INTO exp(exp_name, done, result, aux, time) VALUES (?,?,?,?,?)',(new_exp_name, 0, "UNK", "NA", 0))
 
     spacer_user_options = request_params.get("spacerUserOptions", "")
     var_names = request_params.get("varNames", "")
@@ -251,7 +250,7 @@ def start_spacer():
         
     Popen(run_args, stdin=PIPE, stdout=stdout_file, stderr=stderr_file, cwd = exp_folder)
 
-    return json.dumps({'status': "success", 'spacer_state': "running", 'expName': new_exp_name})
+    return json.dumps({'status': "success", 'spacer_state': "running", 'exp_name': new_exp_name})
 
 def upload_files():
     def _write_file(exp_folder, content, name):
@@ -265,10 +264,11 @@ def upload_files():
     request_params = request.get_json()
     spacer_log = request_params.get('spacerLog', '')
     input_file = request_params.get('inputProblem', '')
+    spacer_state = request_params.get('spacerState', 'uploaded')
     run_cmd = request_params.get('runCmd', '')
     exp_name = request_params.get('expName', '')
     new_exp_name = get_new_exp_name(exp_name)
-    insert_db('INSERT INTO exp(name, done, result, aux, time) VALUES (?,?,?,?,?)',(new_exp_name, False, "UNK", "NA", 0))
+    insert_db('INSERT INTO exp(exp_name, done, result, aux, time) VALUES (?,?,?,?,?)',(new_exp_name, False, "UNK", "NA", 0))
     exp_folder = os.path.join(MEDIA, new_exp_name)
     os.mkdir(exp_folder)
 
@@ -276,30 +276,24 @@ def upload_files():
     _write_file(exp_folder, input_file, "input_file.smt2")
     _write_file(exp_folder, spacer_log, "spacer.log")
     _write_file(exp_folder, run_cmd, "run_cmd")
-    _write_file(exp_folder, "sat\n", "stdout")
+    _write_file(exp_folder, spacer_state, "stdout")
 
     return json.dumps({'status': "success", 'message': "success"})
-
-def save_var_rels(rel, f):
-    if (rel.name() == "simple!!query"):
-        return
-    file_line = "(declare-const {name} ({sort}))\n"
-    for i in range(rel._fdecl.arity()):
-        name = rel._mk_arg_name(i)
-        sort = str(rel._fdecl.domain(i)).replace(",", "").replace("(", " ").replace(")", "")
-        f.write(file_line.format(name=name, sort=sort))
 
 def poke():
     #TODO: finish parsing using all the files in the exp_folder (input_file, etc.)
     request_params = request.get_json()
     exp_name = request_params.get('expName', '')
-    is_completed = query_db('SELECT (done) FROM exp WHERE name =?', (exp_name,), one = True)
-    if is_completed and is_completed["done"]:
-        print(is_completed)
-        print(is_completed["done"])
-        pass
+
+    #check if it is already in the db
+    in_db = query_db("SELECT * FROM nodes_list WHERE exp_name = ?", (exp_name,))
+
+    if in_db:
+        assert(len(in_db) == 1)
+        res = json.loads(in_db[0]['nodes_list'])
     else:
-        res = ms.parse_ongoing_exp(exp_name)
+        res = ms.parse_exp(exp_name)
+
 
     return json.dumps(res)
 
