@@ -187,39 +187,25 @@ def parse_exp(exp_name):
 
     status = "success"
     spacer_state = get_spacer_state(stderr, stdout)
-    #load the file into db for parsing
+    #generate var_decls
     try:
+        print("trying to parse input")
         new_context = z3.Context()
-        db = H.load_horn_db_from_file(os.path.join(exp_folder, "input_file.smt2"))
+        db = H.load_horn_db_from_file(os.path.join(exp_folder, "input_file.smt2"), new_context)
+        print("done load horndb")
         for rel_name in db._rels:
             rel = db.get_rel(rel_name)
             rels.append(rel)
         with open(os.path.join(exp_folder, "var_decls"), "w") as f:
             for rel in rels:
-                save_var_rels(rel, f);
+                save_var_rels(rel, f)
+        print("done parsing input")
     except:
         traceback.print_exc()
         status = "error in loading horndb. skip parsing the file"
         print(status)
+    #parse events
     nodes_list = parse(spacer_log)
-    #parse expr to json
-    # if len(rels)>0:
-    #     for idx in nodes_list:
-    #         node = nodes_list[idx]
-    #         if node["exprID"]>2:
-    #             expr = node["expr"]
-    #             expr_stream = io.StringIO(expr)
-    #             node["ast_json"] = {"type": "ERROR", "content": "NA"}
-    #             for rel in rels:
-    #                 try:
-    #                     ast = rel.pysmt_parse_lemma(expr_stream)
-    #                     ast_json = order_node(to_json(ast))
-    #                     node["ast_json"] = ast_json
-    #                 except Exception as e:
-    #                     print(rels)
-    #                     traceback.print_exc()
-    #                 break
-
     
     res = {'status': status,
            'spacer_state': spacer_state,
