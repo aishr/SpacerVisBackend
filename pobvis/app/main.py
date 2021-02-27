@@ -74,7 +74,6 @@ def learn_transformation():
     spacer_instance = {"Id": exp_name, "Lemmas": {}}
     inputOutputExamples = request_params.get('inputOutputExamples', '')
     params = request_params.get('params', '')
-    tType = request_params.get('type', '')
     body = {
         'instance': exp_name,
         'inputOutputExamples': inputOutputExamples,
@@ -83,19 +82,20 @@ def learn_transformation():
 
     print("spacer_instance", json.dumps(spacer_instance, indent=4)[:200])
     print("input output examples", json.dumps(inputOutputExamples, indent = 2))
-    if tType == "replace":
-        body['params'] = params 
-        url = os.path.join(PROSEBASEURL, 'variables', 'replace')
-        response = requests.post(url, json=body)
-        if response.status_code != 200:
-            abort(response.status_code)
 
-        return json.dumps({'status': "success", "response": response.json()})
+    #NHAM: temporary disable until Replace from Prose is working
+    # if tType == "replace":
+    #     body['params'] = params 
+    #     url = os.path.join(PROSEBASEURL, 'variables', 'replace')
+    #     response = requests.post(url, json=body)
+    #     if response.status_code != 200:
+    #         abort(response.status_code)
+
+    #     return json.dumps({'status': "success", "response": response.json()})
     
         
     declare_statements = get_declare_statements(exp_folder)
     body['declareStatements'] = declare_statements
-    body['type'] = tType
     url = os.path.join(PROSEBASEURL, 'transformations', 'learntransformation')
     response = requests.post(url, json=body)
     if response.status_code != 200:
@@ -117,26 +117,27 @@ def learn_transformation():
         cur.close()
 
     return json.dumps({'status': "success", "response": response.json()})
-    
-def apply_transformation():
-    request_params = request.get_json()
-    exp_name = request_params.get('expName', '')
-    chosen_program = request_params.get('selectedProgram', '')
-    exp_folder = os.path.join(MEDIA, exp_name)
-    spacer_instance = get_spacer_instance(exp_name)
-    declare_statements = get_declare_statements(exp_folder)
-    print(json.dumps(spacer_instance, indent=4)[:200])
-    body = {
-        'declareStatements': declare_statements,
-        'program': chosen_program,
-        'spacerInstance': json.dumps(spacer_instance)
-    }
-    url = os.path.join(PROSEBASEURL, 'transformations', 'applytransformation')
-    response = requests.post(url, json=body)
-    if response.status_code != 200:
-        abort(response.status_code)
 
-    return json.dumps({'status': "success", "response": response.json()})
+# NHAM: will use apply_multi_transformation to simplify dataflow for ExprMap
+# def apply_transformation():
+#     request_params = request.get_json()
+#     exp_name = request_params.get('expName', '')
+#     chosen_program = request_params.get('selectedProgram', '')
+#     exp_folder = os.path.join(MEDIA, exp_name)
+#     spacer_instance = get_spacer_instance(exp_name)
+#     declare_statements = get_declare_statements(exp_folder)
+#     print(json.dumps(spacer_instance, indent=4)[:200])
+#     body = {
+#         'declareStatements': declare_statements,
+#         'program': chosen_program,
+#         'spacerInstance': json.dumps(spacer_instance)
+#     }
+#     url = os.path.join(PROSEBASEURL, 'transformations', 'applytransformation')
+#     response = requests.post(url, json=body)
+#     if response.status_code != 200:
+#         abort(response.status_code)
+
+#     return json.dumps({'status': "success", "response": response.json()})
 
 def apply_multi_transformation():
     """
