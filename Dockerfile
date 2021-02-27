@@ -12,7 +12,7 @@ FROM ubuntu:20.04
 #│       ├── settings.py
 #│       ├── start_server.sh
 #│       └── utils
-#└── z3s
+#z3s
 RUN apt update && apt install -y wget unzip
 RUN wget https://github.com/Z3Prover/z3/releases/download/z3-4.8.9/z3-4.8.9-x64-ubuntu-16.04.zip -O z3s.zip
 RUN unzip -j z3s.zip -d z3s/
