@@ -70,7 +70,8 @@ def learn_transformation():
     request_params = request.get_json()
     exp_name = request_params.get('expName', '')
     exp_folder = os.path.join(MEDIA, exp_name)
-    spacer_instance = get_spacer_instance(exp_name)
+    # learn transformation doesnt use exprMap(Lemmas) so we should give it empty object
+    spacer_instance = {"Id": exp_name, "Lemmas": {}}
     inputOutputExamples = request_params.get('inputOutputExamples', '')
     params = request_params.get('params', '')
     tType = request_params.get('type', '')
@@ -80,7 +81,8 @@ def learn_transformation():
         'spacerInstance': json.dumps(spacer_instance)
     }
 
-    print(json.dumps(spacer_instance, indent=4)[:200])
+    print("spacer_instance", json.dumps(spacer_instance, indent=4)[:200])
+    print("input output examples", json.dumps(inputOutputExamples, indent = 2))
     if tType == "replace":
         body['params'] = params 
         url = os.path.join(PROSEBASEURL, 'variables', 'replace')
@@ -134,8 +136,6 @@ def apply_transformation():
     if response.status_code != 200:
         abort(response.status_code)
 
-    with open(os.path.join(exp_folder, "transformed_expr_map"), "w") as f:
-         f.write(json.dumps(response.json()))
     return json.dumps({'status': "success", "response": response.json()})
 
 def apply_multi_transformation():
@@ -166,8 +166,6 @@ def apply_multi_transformation():
     if response.status_code != 200:
         abort(response.status_code)
 
-    with open(os.path.join(exp_folder, "transformed_expr_map"), "w") as f:
-         f.write(json.dumps(response.json()))
     return json.dumps({'status': "success", "response": response.json()})
 
 def get_declare_statements(exp_folder):
