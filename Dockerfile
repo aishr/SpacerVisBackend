@@ -19,7 +19,7 @@ RUN unzip -j z3s.zip -d z3s/
 #install other stuffs
 RUN apt update && apt install -y vim python3-pip apt-transport-https sqlite3
 
-#copy just the requirements to install
+#copy just the requirements to install,
 #so that we dont have to rebuild with changes in the code
 COPY ./pobvis/requirements.txt /SpacerBackend/pobvis/requirements.txt
 COPY ./chc-tools/requirements.txt /SpacerBackend/chc-tools/requirements.txt
