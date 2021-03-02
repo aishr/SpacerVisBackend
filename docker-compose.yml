@@ -6,7 +6,7 @@ services:
     ports: 
       - 5000:5000
   SpacerProseBackend:
-    image: aishr/spacer-prose-backend:latest
+    image: aishr/spacer-prose-backend:latest 
     ports: 
       - 2000:2000
 
