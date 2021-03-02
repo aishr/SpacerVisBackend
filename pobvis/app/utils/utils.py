@@ -133,7 +133,7 @@ def get_spacer_state(stderr, stdout):
     """
     must return one of the state in accepted states
     """
-    accepted_states = ["sat", "unsat", "unk", "running", "uploaded"]
+    accepted_states = ["sat", "unsat", "unknown", "running", "uploaded"]
     res = "running"
     #TODO: implement me
     if stdout[0] != '':
