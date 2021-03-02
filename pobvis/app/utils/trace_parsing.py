@@ -49,6 +49,8 @@ class Event (object):
         self.exprID = -1
         self.pobID = -1
         self.level = -1
+        self.pt_name = "NA"
+
     def add_line(self, line):
         self.lines.append(line)
 
@@ -58,7 +60,7 @@ class Event (object):
             self.level = int(self.lines[0].strip().split()[-1])
         elif self.lines[0].startswith("** expand-pob"):
             self.event_type = EType.EXP_POB
-            _, _, _, label1, level, label2, depth, label3, exprID, label4, pobID = self.lines[0].strip().split()[:11]
+            _, _, pt_name, label1, level, label2, depth, label3, exprID, label4, pobID = self.lines[0].strip().split()[:11]
             assert(label1=="level:")
             self.level = int(level)
             assert(label2=="depth:")
@@ -70,6 +72,8 @@ class Event (object):
                 self.pobID = -1
             else:
                 self.pobID = int(pobID)
+
+            self.pt_name = pt_name
  
         elif self.lines[0].startswith("** add-lemma"):
             _, label0, level, label1, exprID, label2, pobID = self.lines[0].strip().split()[:7]
@@ -139,6 +143,7 @@ class Event (object):
                 "level": self.level,
                 "exprID": self.exprID,
                 "pobID": self.pobID,
+                "pt_name": self.pt_name,
                 "to_be_vis": True}
 
 def parse(lines):
