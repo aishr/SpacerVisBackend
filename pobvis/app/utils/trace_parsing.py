@@ -1,4 +1,4 @@
-"""A parser for vampire output."""
+"""A parser for spacer output."""
 
 import logging
 import re
@@ -6,6 +6,13 @@ from collections import namedtuple
 import json
 from enum import Enum
 import sys
+import os
+from app.settings import DATABASE, MEDIA
+from app.utils.utils import *
+import traceback
+import z3
+from chctools import horndb as H
+import io
 
 class EType(Enum):
     EXP_LVL = 0
@@ -156,6 +163,66 @@ def parse(lines):
 
     return spacer_nodes
 
+def save_var_rels(rel, f):
+    if (rel.name() == "simple!!query"):
+        return
+    file_line = "(declare-const {name} ({sort}))\n"
+    for i in range(rel._fdecl.arity()):
+        name = rel._mk_arg_name(i)
+        sort = str(rel._fdecl.domain(i)).replace(",", "").replace("(", " ").replace(")", "")
+        f.write(file_line.format(name=name, sort=sort))
+
+def parse_exp(exp_name):
+    exp_folder = os.path.join(MEDIA, exp_name)
+    nodes_list = []
+    run_cmd = ""
+    stdout = safe_read(os.path.join(exp_folder, "stdout"))
+    stderr = safe_read(os.path.join(exp_folder, "stderr"))
+    spacer_log = safe_read(os.path.join(exp_folder, "spacer.log"))
+    run_cmd = safe_read(os.path.join(exp_folder, "run_cmd"))[0].strip()
+    temp_var_names = safe_read(os.path.join(exp_folder, "var_names")) 
+    var_names = temp_var_names[0].strip() if temp_var_names != [] else ""
+    expr_map = get_expr_map(exp_name)
+    rels = []
+
+    status = "success"
+    spacer_state = get_spacer_state(stderr, stdout)
+    #generate var_decls
+    try:
+        print("trying to parse input")
+        new_context = z3.Context()
+        db = H.load_horn_db_from_file(os.path.join(exp_folder, "input_file.smt2"), new_context)
+        print("done load horndb")
+        for rel_name in db._rels:
+            rel = db.get_rel(rel_name)
+            rels.append(rel)
+        with open(os.path.join(exp_folder, "var_decls"), "w") as f:
+            for rel in rels:
+                save_var_rels(rel, f)
+        print("done parsing input")
+    except:
+        traceback.print_exc()
+        status = "error in loading horndb. skip parsing the file"
+        print(status)
+    #parse events
+    nodes_list = parse(spacer_log)
+    
+    res = {'status': status,
+           'spacer_state': spacer_state,
+           'nodes_list': nodes_list,
+           'run_cmd': run_cmd,
+           'var_names': var_names,
+           'expr_map': expr_map}
+
+    #write to db
+    if spacer_state !="running":
+        try:
+            insert_db('REPLACE INTO nodes_list(exp_name, nodes_list) VALUES (?,?)',
+                      (exp_name, json.dumps(res)))
+        except:
+            traceback.print_exc()
+
+    return res
 if __name__=="__main__":
     file_name = "/home/nv3le/workspace/saturation-visualization/deepSpacer/pobvis/app/.z3-trace" 
     if len(sys.argv) > 1:

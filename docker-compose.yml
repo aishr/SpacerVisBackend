@@ -9,3 +9,4 @@ services:
     image: aishr/spacer-prose-backend:latest 
     ports: 
       - 2000:2000
+

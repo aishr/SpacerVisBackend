@@ -1,6 +1,5 @@
 """Style guide: use underscore for all variable and function names"""
 import requests
-import boto3
 import sys
 if sys.version_info.major < 3:
     raise Exception("User error: This application only supports Python 3, so please use python3 instead of python!")
@@ -9,18 +8,16 @@ from flask import Flask, request, abort
 from flask_cors import CORS
 import tempfile
 import argparse
-from chctools import horndb as H
-import io
 import os
-from os import environ
-from settings import DATABASE, MEDIA, PROSEBASEURL, options_for_visualization
+
 from subprocess import PIPE, STDOUT, Popen, run, check_output
-from chctools import horndb as H
-from utils.utils import *
-import utils.trace_parsing as ms
+from app.settings import DATABASE, MEDIA, PROSEBASEURL, options_for_visualization
+from app.utils.utils import *
+import app.utils.trace_parsing as ms
 import re
 import hashlib
-import z3
+import traceback
+
 app = Flask(__name__)
 app.config.from_object(__name__)
 CORS(app)
@@ -35,13 +32,14 @@ def update_status():
         r = {}
         for k in exp.keys():
             r[k] = exp[k]
-        exps_list.append(exp["name"])
+        exps_list.append(exp["exp_name"])
 
-    for exp in exps_list:
-        print("EXP:", exp)
-        is_running = check_if_process_running(exp)
-        if not is_running:
-            get_db().execute('UPDATE exp SET done = 1 WHERE name = ?', (exp,));
+    # NHAM: Legacy code. Now we will check if the parsing is done using the parser itself
+    # for exp in exps_list:
+    #     print("EXP:", exp)
+    #     is_running = check_if_process_running(exp)
+    #     if not is_running:
+    #         get_db().execute('UPDATE exp SET done = 1 WHERE name = ?', (exp,));
 
     #commit
     get_db().commit()
@@ -70,32 +68,34 @@ def parse_options(lines):
 
 def learn_transformation():
     request_params = request.get_json()
-    exp_path = request_params.get('exp_path', '')
-    exp_folder = os.path.join(MEDIA, exp_path)
-    spacer_instance = get_spacer_instance(exp_path)
+    exp_name = request_params.get('expName', '')
+    exp_folder = os.path.join(MEDIA, exp_name)
+    # learn transformation doesnt use exprMap(Lemmas) so we should give it empty object
+    spacer_instance = {"Id": exp_name, "Lemmas": {}}
     inputOutputExamples = request_params.get('inputOutputExamples', '')
     params = request_params.get('params', '')
-    tType = request_params.get('type', '')
     body = {
-        'instance': exp_path,
+        'instance': exp_name,
         'inputOutputExamples': inputOutputExamples,
         'spacerInstance': json.dumps(spacer_instance)
     }
 
-    print(json.dumps(spacer_instance, indent=4)[:200])
-    if tType == "replace":
-        body['params'] = params 
-        url = os.path.join(PROSEBASEURL, 'variables', 'replace')
-        response = requests.post(url, json=body)
-        if response.status_code != 200:
-            abort(response.status_code)
+    print("spacer_instance", json.dumps(spacer_instance, indent=4)[:200])
+    print("input output examples", json.dumps(inputOutputExamples, indent = 2))
 
-        return json.dumps({'status': "success", "response": response.json()})
+    #NHAM: temporary disable until Replace from Prose is working
+    # if tType == "replace":
+    #     body['params'] = params 
+    #     url = os.path.join(PROSEBASEURL, 'variables', 'replace')
+    #     response = requests.post(url, json=body)
+    #     if response.status_code != 200:
+    #         abort(response.status_code)
+
+    #     return json.dumps({'status': "success", "response": response.json()})
     
         
     declare_statements = get_declare_statements(exp_folder)
     body['declareStatements'] = declare_statements
-    body['type'] = tType
     url = os.path.join(PROSEBASEURL, 'transformations', 'learntransformation')
     response = requests.post(url, json=body)
     if response.status_code != 200:
@@ -117,28 +117,27 @@ def learn_transformation():
         cur.close()
 
     return json.dumps({'status': "success", "response": response.json()})
-    
-def apply_transformation():
-    request_params = request.get_json()
-    exp_path = request_params.get('exp_path', '')
-    chosen_program = request_params.get('selectedProgram', '')
-    exp_folder = os.path.join(MEDIA, exp_path)
-    spacer_instance = get_spacer_instance(exp_path)
-    declare_statements = get_declare_statements(exp_folder)
-    print(json.dumps(spacer_instance, indent=4)[:200])
-    body = {
-        'declareStatements': declare_statements,
-        'program': chosen_program,
-        'spacerInstance': json.dumps(spacer_instance)
-    }
-    url = os.path.join(PROSEBASEURL, 'transformations', 'applytransformation')
-    response = requests.post(url, json=body)
-    if response.status_code != 200:
-        abort(response.status_code)
 
-    with open(os.path.join(exp_folder, "transformed_expr_map"), "w") as f:
-         f.write(json.dumps(response.json()))
-    return json.dumps({'status': "success", "response": response.json()})
+# NHAM: will use apply_multi_transformation to simplify dataflow for ExprMap
+# def apply_transformation():
+#     request_params = request.get_json()
+#     exp_name = request_params.get('expName', '')
+#     chosen_program = request_params.get('selectedProgram', '')
+#     exp_folder = os.path.join(MEDIA, exp_name)
+#     spacer_instance = get_spacer_instance(exp_name)
+#     declare_statements = get_declare_statements(exp_folder)
+#     print(json.dumps(spacer_instance, indent=4)[:200])
+#     body = {
+#         'declareStatements': declare_statements,
+#         'program': chosen_program,
+#         'spacerInstance': json.dumps(spacer_instance)
+#     }
+#     url = os.path.join(PROSEBASEURL, 'transformations', 'applytransformation')
+#     response = requests.post(url, json=body)
+#     if response.status_code != 200:
+#         abort(response.status_code)
+
+#     return json.dumps({'status': "success", "response": response.json()})
 
 def apply_multi_transformation():
     """
@@ -146,16 +145,16 @@ def apply_multi_transformation():
     It is essentially the same as apply_transformation, but use the expr_map sent by
     the frontend, instead of from the db, a.k.a line
 
-    spacer_instance = {"Id": exp_path, "Lemmas": lemmas}
+    spacer_instance = {"Id": exp_name, "Lemmas": lemmas}
     vs
-    spacer_instance = get_spacer_instance(exp_path)
+    spacer_instance = get_spacer_instance(exp_name)
     """
     request_params = request.get_json()
-    exp_path = request_params.get('exp_path', '')
+    exp_name = request_params.get('expName', '')
     lemmas = request_params.get('lemmas', {})
     chosen_program = request_params.get('selectedProgram', '')
-    exp_folder = os.path.join(MEDIA, exp_path)
-    spacer_instance = {"Id": exp_path, "Lemmas": lemmas}
+    exp_folder = os.path.join(MEDIA, exp_name)
+    spacer_instance = {"Id": exp_name, "Lemmas": lemmas}
     declare_statements = get_declare_statements(exp_folder)
     print(json.dumps(spacer_instance, indent=4)[:200])
     body = {
@@ -168,8 +167,6 @@ def apply_multi_transformation():
     if response.status_code != 200:
         abort(response.status_code)
 
-    with open(os.path.join(exp_folder, "transformed_expr_map"), "w") as f:
-         f.write(json.dumps(response.json()))
     return json.dumps({'status': "success", "response": response.json()})
 
 def get_declare_statements(exp_folder):
@@ -184,15 +181,15 @@ def save_exprs(dynamodb=None):
     status = "success"
     try:
         request_params = request.get_json()
-        exp_path = request_params.get('exp_path', '')
+        exp_name = request_params.get('expName', '')
         expr_map = request_params.get('expr_map', '')
         expr_map = json.loads(expr_map)
-        exp_folder = os.path.join(MEDIA, exp_path)
+        exp_folder = os.path.join(MEDIA, exp_name)
 
         cur = None
         for k in expr_map:
             #use replace to insert
-            cur = get_db().execute('REPLACE INTO expr_map(exp_path, expr_id, value) VALUES (?,?,?)',(exp_path,
+            cur = get_db().execute('REPLACE INTO expr_map(exp_name, expr_id, value) VALUES (?,?,?)',(exp_name,
                                                                                                      int(k),
                                                                                                      json.dumps(expr_map[k])))
         if cur is not None:
@@ -200,16 +197,17 @@ def save_exprs(dynamodb=None):
             cur.close()
 
     except Exception as e:
+        traceback.print_exc()
         status = "Error: {}".format(e)
     return json.dumps({'status': status})
 
 def get_exprs(): 
     request_params = request.get_json()
-    exp_path = request_params.get('exp_path', '')
+    exp_name = request_params.get('expName', '')
 
 
-    print("exp_path", exp_path)
-    expr_map = get_expr_map(exp_path)
+    print("exp_name", exp_name)
+    expr_map = get_expr_map(exp_name)
 
     return json.dumps({'status': "success",
                        'expr_map': expr_map})
@@ -217,10 +215,10 @@ def get_exprs():
 def start_spacer():
     request_params = request.get_json()
     file_content = request_params.get('file', '')
-    exp_name = request_params.get('name', '')
+    exp_name = request_params.get('expName', '')
     new_exp_name = get_new_exp_name(exp_name)
     print(new_exp_name)
-    insert_db('INSERT INTO exp(name, done, result, aux, time) VALUES (?,?,?,?,?)',(new_exp_name, 0, "UNK", "NA", 0))
+    insert_db('INSERT INTO exp(exp_name, done, result, aux, time) VALUES (?,?,?,?,?)',(new_exp_name, 0, "UNK", "NA", 0))
 
     spacer_user_options = request_params.get("spacerUserOptions", "")
     var_names = request_params.get("varNames", "")
@@ -265,10 +263,11 @@ def upload_files():
     request_params = request.get_json()
     spacer_log = request_params.get('spacerLog', '')
     input_file = request_params.get('inputProblem', '')
+    spacer_state = request_params.get('spacerState', 'uploaded')
     run_cmd = request_params.get('runCmd', '')
     exp_name = request_params.get('expName', '')
     new_exp_name = get_new_exp_name(exp_name)
-    insert_db('INSERT INTO exp(name, done, result, aux, time) VALUES (?,?,?,?,?)',(new_exp_name, 0, "UNK", "NA", 0))
+    insert_db('INSERT INTO exp(exp_name, done, result, aux, time) VALUES (?,?,?,?,?)',(new_exp_name, False, "UNK", "NA", 0))
     exp_folder = os.path.join(MEDIA, new_exp_name)
     os.mkdir(exp_folder)
 
@@ -276,77 +275,27 @@ def upload_files():
     _write_file(exp_folder, input_file, "input_file.smt2")
     _write_file(exp_folder, spacer_log, "spacer.log")
     _write_file(exp_folder, run_cmd, "run_cmd")
-    _write_file(exp_folder, "sat\n", "stdout")
+    _write_file(exp_folder, spacer_state, "stdout")
 
     return json.dumps({'status': "success", 'message': "success"})
-
-def save_var_rels(rel, f):
-    if (rel.name() == "simple!!query"):
-        return
-    file_line = "(declare-const {name} ({sort}))\n"
-    for i in range(rel._fdecl.arity()):
-        name = rel._mk_arg_name(i)
-        sort = str(rel._fdecl.domain(i)).replace(",", "").replace("(", " ").replace(")", "")
-        f.write(file_line.format(name=name, sort=sort))
 
 def poke():
     #TODO: finish parsing using all the files in the exp_folder (input_file, etc.)
     request_params = request.get_json()
-    exp_path = request_params.get('exp_path', '')
-    exp_folder = os.path.join(MEDIA, exp_path)
-    nodes_list = []
-    run_cmd = ""
-    stdout = safe_read(os.path.join(exp_folder, "stdout"))
-    stderr = safe_read(os.path.join(exp_folder, "stderr"))
-    spacer_log = safe_read(os.path.join(exp_folder, "spacer.log"))
-    run_cmd = safe_read(os.path.join(exp_folder, "run_cmd"))[0].strip()
-    temp_var_names = safe_read(os.path.join(exp_folder, "var_names")) 
-    var_names = temp_var_names[0].strip() if temp_var_names != [] else ""
-    expr_map = get_expr_map(exp_path)
+    exp_name = request_params.get('expName', '')
 
-    status = "success"
-    spacer_state = get_spacer_state(stderr, stdout)
-    #load the file into db for parsing
-    try:
-        new_context = z3.Context()
-        db = H.load_horn_db_from_file(os.path.join(exp_folder, "input_file.smt2"))
-        rels = []
-        for rel_name in db._rels:
-            rel = db.get_rel(rel_name)
-            rels.append(rel)
-        with open(os.path.join(exp_folder, "var_decls"), "w") as f:
-            for rel in rels:
-                save_var_rels(rel, f);
-    except:
-        status = "error in loading horndb. skip parsing the file"
-        print(status)
-    #TODO: only read spacer.log when there are no errors
-    nodes_list = ms.parse(spacer_log)
-    #parse expr to json
-    for idx in nodes_list:
-        node = nodes_list[idx]
-        if node["exprID"]>2:
-            expr = node["expr"]
-            expr_stream = io.StringIO(expr)
-            try:
-                ast = rels[0].pysmt_parse_lemma(expr_stream)
-                ast_json = order_node(to_json(ast))
-                node["ast_json"] = ast_json
-            except Exception as e:
-                # PySMT has a bug in __str__ of the Exception, hence for now we need to turn off the debug message here
-                # print("expr stream:", expr)
-                # print("Exception when ordering the node:", e)
-                # print("Broken Node", node)
-                # print("Broken Node exprID:", node["exprID"])
-                node["ast_json"] = {"type": "ERROR", "content": "trace is incomplete"}
+    #check if it is already in the db
+    in_db = query_db("SELECT * FROM nodes_list WHERE exp_name = ?", (exp_name,))
+
+    if in_db:
+        assert(len(in_db) == 1)
+        res = json.loads(in_db[0]['nodes_list'])
+    else:
+        res = ms.parse_exp(exp_name)
 
 
-    return json.dumps({'status': "success",
-                       'spacer_state': spacer_state,
-                       'nodes_list': nodes_list,
-                       'run_cmd': run_cmd,
-                       'var_names': var_names,
-                       'expr_map': expr_map})
+    return json.dumps(res)
+
 
 
 @app.route('/spacer/fetch_exps', methods=['POST'])
