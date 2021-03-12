@@ -33,19 +33,19 @@ def update_status():
         for k in exp.keys():
             r[k] = exp[k]
         exps_list.append(exp["exp_name"])
-
-    # NHAM: Legacy code. Now we will check if the parsing is done using the parser itself
-    # for exp in exps_list:
-    #     print("EXP:", exp)
-    #     is_running = check_if_process_running(exp)
-    #     if not is_running:
-    #         get_db().execute('UPDATE exp SET done = 1 WHERE name = ?', (exp,));
-
-    #commit
     get_db().commit()
 
+def delete_exp():
+    print("call delete_exp")
+    request_params = request.get_json()
+    expr_name = request_params.get('expName', '')
+
+    delete_db("DELETE FROM exp WHERE exp_name = ?",(expr_name,) )
+    return fetch_exps()
+
+
+
 def pooling():
-    update_status()
     return fetch_exps()
 
 def fetch_options(): 
@@ -162,7 +162,10 @@ def apply_multi_transformation():
         'program': chosen_program,
         'spacerInstance': json.dumps(spacer_instance)
     }
-    url = os.path.join(PROSEBASEURL, 'transformations', 'applytransformation')
+    if chosen_program=="to_readable":
+        url = os.path.join(PROSEBASEURL, 'transformations', 'getreadable')
+    else:
+        url = os.path.join(PROSEBASEURL, 'transformations', 'applytransformation')
     response = requests.post(url, json=body)
     if response.status_code != 200:
         abort(response.status_code)
@@ -319,6 +322,9 @@ def handle_save():
 @app.route('/spacer/get_exprs', methods=['POST'])
 def handle_get():
     return get_exprs()
+@app.route('/spacer/delete_exp', methods=['POST'])
+def handle_delete_exp():
+    return delete_exp()
 @app.route('/spacer/learn_transformation', methods=['POST'])
 def handle_learn_transform():
     return learn_transformation()
