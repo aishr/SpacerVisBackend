@@ -48,6 +48,12 @@ def insert_db(query, args=(), one=False):
     get_db().commit()
     cur.close()
 
+def delete_db(query, args=(), one=False):
+    cur = get_db().execute(query, args)
+    get_db().commit()
+    cur.close()
+
+
 def fetch_exps():
     exps_list = []
     for exp in query_db('select * from exp'):
